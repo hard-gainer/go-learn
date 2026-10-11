@@ -9,6 +9,24 @@ import (
 	"time"
 )
 
+// 1. Создайте интерфейс Validatable с единственным методом Validate() error. Назначение интерфейса — задать контракт на проверку валидности данных структуры.
+// 2. Реализуйте интерфейс Validatable для структуры Transaction. Метод Validate() для Transaction должен проверять корректность полей транзакции, например:
+// · Amount не должен быть 0 или отрицательным,
+// · Category не должна быть пустой строкой,
+// · Date должна быть в корректном формате (при использовании строки можно пропустить проверку формата).
+// Если все поля заполнены корректно, должно возвращаться nil, иначе должно возвращаться соответствующая ошибка с описанием проблемы.
+// Методы Validate() не должны логировать, они только возвращают error. Логирование происходит в вызывающем коде.
+// 3. Реализуйте интерфейс Validatable для структуры Budget. Метод Validate() для Budget проверяет:
+// · Limit (лимит) — должен быть положительным числом;
+// · Category — не должна быть пустая.
+// При неверных данных необходимо вернуть ошибку, при корректных — nil.
+// 4. Модифицируйте функции добавления данных в Ledger: перед добавлением новой транзакции или бюджета, вызывайте метод Validate() для соответствующей структуры. Если метод вернул ошибку, не добавляйте объект и передайте ошибку дальше или логируйте её. Таким образом, вы отделите логику проверки данных от основной бизнес-логики.
+// 5. Для демонстрации работы интерфейсов напишите функцию, принимающую параметр типа Validatable (например, func CheckValid(v Validatable) error), которая вызывает v.Validate() и возвращает результат. В main протестируйте эту функцию с объектом Transaction и Budget, убедившись, что она корректно работает с разными типами (полиморфизм через интерфейс).
+
+type Validatable interface {
+	Validate() error
+}
+
 type Transaction struct {
 	ID          int
 	Amount      float64
@@ -30,6 +48,31 @@ func SetBudget(b Budget) {
 	budgetStorage[b.Category] = b
 }
 
+func (t *Transaction) Validate() error {
+	var errs []error
+	if t.Amount <= 0 {
+		errs = append(errs, errors.New("amount must be a positive number"))
+	}
+	if t.Category == "" {
+		errs = append(errs, errors.New("category must't be blank"))
+	}
+	if t.Description == "" {
+		errs = append(errs, errors.New("category must't be blank"))
+	}
+	return errors.Join(errs...)
+}
+
+func (b *Budget) Validate() error {
+	var errs []error
+	if b.Limit <= 0 {
+		errs = append(errs, errors.New("limit must be a positive number"))
+	}
+	if b.Category == "" {
+		errs = append(errs, errors.New("category must't be blank"))
+	}
+	return errors.Join(errs...)
+}
+
 func LoadBudgets(r io.Reader) error {
 	var err error
 	budgets := make([]Budget, 0, 2)
@@ -45,8 +88,8 @@ func LoadBudgets(r io.Reader) error {
 }
 
 func (s *Storage) AddTransaction(tx Transaction) error {
-	if tx.Amount < 0 || tx.Category == "" || tx.Description == "" {
-		return fmt.Errorf("invalid transaction")
+	if err := tx.Validate(); err != nil {
+		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
 	if budget, ok := budgetStorage[tx.Category]; ok {
@@ -72,6 +115,10 @@ func (s *Storage) computeTotalByCategory(category string) float64 {
 		}
 	}
 	return sum
+}
+
+func CheckValid(v Validatable) error {
+	return v.Validate()
 }
 
 func main() {
@@ -143,4 +190,16 @@ func main() {
 	}
 
 	fmt.Println(budgetStorage)
+
+	var b Validatable = &Budget{}
+	validBErr := CheckValid(b)
+	if validBErr != nil {
+		fmt.Println(validBErr)
+	}
+
+	var t Validatable = &Transaction{}
+	validTErr := CheckValid(t)
+	if validTErr != nil {
+		fmt.Println(validTErr)
+	}
 }
