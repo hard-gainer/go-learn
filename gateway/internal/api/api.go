@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -12,6 +14,31 @@ type CreateTransactionRequest struct {
 	Category    string    `json:"category"`
 	Description string    `json:"description"`
 	Date        time.Time `json:"date"`
+}
+
+func (req *CreateTransactionRequest) UnmarshalJSON(data []byte) error {
+	type request CreateTransactionRequest
+	value := struct {
+		*request
+		Date *string `json:"date"`
+	}{request: (*request)(req)}
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	if value.Date == nil {
+		return nil
+	}
+
+	layout := time.RFC3339
+	if len(*value.Date) == len(time.DateOnly) {
+		layout = time.DateOnly
+	}
+	date, err := time.Parse(layout, *value.Date)
+	if err != nil {
+		return errors.New("date must be YYYY-MM-DD or RFC 3339")
+	}
+	req.Date = date
+	return nil
 }
 
 type TransactionResponse struct {
