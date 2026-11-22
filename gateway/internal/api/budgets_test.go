@@ -25,8 +25,8 @@ func TestListBudgets(t *testing.T) {
 	}
 
 	check("[]")
-	store.SetBudget(ledger.Budget{Category: "travel", Limit: 5000})
-	store.SetBudget(ledger.Budget{Category: "food", Limit: 2500})
+	setTestBudget(t, store, ledger.Budget{Category: "travel", Limit: 5000})
+	setTestBudget(t, store, ledger.Budget{Category: "food", Limit: 2500})
 	check(`[{"category":"food","limit":2500},{"category":"travel","limit":5000}]`)
 }
 
@@ -59,8 +59,8 @@ func TestCreateBudget(t *testing.T) {
 				err != nil || len(body) != 1 || !strings.HasPrefix(body["error"], tc.wantError) {
 				t.Fatalf("status = %d, headers = %v, body = %s, decode error = %v", w.Code, w.Header(), w.Body, err)
 			}
-			if len(store.ListBudgets()) != 0 {
-				t.Fatal("invalid request saved a budget")
+			if budgets, err := store.ListBudgets(); err != nil || len(budgets) != 0 {
+				t.Fatalf("budgets after invalid request = %v, error = %v", budgets, err)
 			}
 		})
 	}

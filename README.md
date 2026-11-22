@@ -8,7 +8,7 @@
 go -C gateway run .
 ```
 
-Gateway слушает порт `8080` и загружает начальные бюджеты из [ledger/budgets.json](ledger/budgets.json). Транзакции и изменения бюджетов хранятся в памяти до перезапуска.
+Gateway слушает порт `8080` и хранит бюджеты и транзакции в PostgreSQL. Примените миграции перед запуском. В новой базе бюджеты создаются через `POST /api/budgets`.
 
 ## Миграции PostgreSQL
 
@@ -37,13 +37,13 @@ make migrate-down
 go -C ledger run .
 ```
 
-При успешном подключении Ledger выведет `Ledger connected to PostgreSQL`. Затем запустите Gateway командой `go -C gateway run .` и проверьте HTTP-эндпоинты.
+При успешном подключении Ledger выведет `Ledger connected to PostgreSQL`. Затем запустите Gateway командой `go -C gateway run .` с той же `DATABASE_URL` и проверьте HTTP-эндпоинты.
 
 Если `DATABASE_URL` не задана, Ledger собирает адрес из `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS` и `DB_NAME`. Значения по умолчанию для локальной разработки — `localhost`, `5432`, `postgres`, `postgres` и `cashapp` соответственно, с `sslmode=disable`.
 
 ## Тесты и покрытие
 
-Из корня репозитория запустите тесты обоих модулей. Флаг `-v` показывает отдельные сценарии.
+Из корня репозитория запустите тесты обоих модулей. Для интеграционных тестов задайте `TEST_DATABASE_URL` с адресом отдельной тестовой базы PostgreSQL. Тесты создают и удаляют изолированную схему для каждого сценария. Без этой переменной сценарии с PostgreSQL пропускаются. Флаг `-v` показывает отдельные сценарии.
 
 ```bash
 go -C ledger test -v ./...
@@ -57,7 +57,9 @@ go -C gateway test -v ./...
   coverage_workspace=$(mktemp -d) &&
   GOWORK=off go -C "$coverage_workspace" work init "$PWD/gateway" "$PWD/ledger" &&
   export GOWORK="$coverage_workspace/go.work" &&
-  go test ./gateway/... ./ledger/... -cover -coverpkg=./gateway/...,./ledger/... -coverprofile=cover.out &&
+  go test ./gateway/... ./ledger/... -cover \
+    -coverpkg=./gateway,./gateway/internal/api,./ledger,./ledger/core,./ledger/internal/db \
+    -coverprofile=cover.out &&
   go tool cover -func=cover.out &&
   go tool cover -html=cover.out -o cover.html
 )
@@ -70,7 +72,7 @@ go -C gateway test -v ./...
 | Метод и путь | Результат |
 | --- | --- |
 | `GET /ping` | `200 OK` и JSON-строка `"pong"` |
-| `GET /api/transactions` | `200 OK` и массив транзакций. Если записей нет, возвращается `[]` |
+| `GET /api/transactions` | `200 OK` и массив транзакций от новых дат к старым. Для одной даты первыми идут записи с большим `id` |
 | `POST /api/transactions` | `201 Created` и созданная транзакция с `id` |
 | `GET /api/budgets` | `200 OK` и массив бюджетов по категориям |
 | `POST /api/budgets` | `201 Created` и сохранённый бюджет. Для существующей категории запрос заменяет лимит |

@@ -2,10 +2,15 @@ package main_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
+	"time"
 
 	ledger "ledger/core"
+	"ledger/testutil"
 )
+
+const testMigration = "migrations/00001_create_budgets_and_expenses.up.sql"
 
 func TestTransactionValidation(t *testing.T) {
 	t.Parallel()
@@ -57,19 +62,20 @@ func TestBudgetValidation(t *testing.T) {
 }
 
 func TestStorageBudgetLimit(t *testing.T) {
-	store := ledger.NewStorage()
-	t.Cleanup(store.Reset)
-	store.SetBudget(ledger.Budget{Category: "еда", Limit: 5000})
+	store := testutil.NewStorage(t, testMigration)
+	if err := store.SetBudget(ledger.Budget{Category: "еда", Limit: 5000}); err != nil {
+		t.Fatal(err)
+	}
 
 	created, err := store.AddTransaction(ledger.Transaction{
-		Amount: 3000, Category: "еда", Description: "продукты",
+		Amount: 3000, Category: "еда", Description: "продукты", Date: time.Date(2026, 11, 23, 0, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("transaction within the budget: %v", err)
 	}
-	before := store.ListTransactions()
-	if len(before) != 1 || before[0] != created {
-		t.Fatalf("stored transactions = %+v, want [%+v]", before, created)
+	before, err := store.ListTransactions()
+	if err != nil || len(before) != 1 || before[0] != created || created.ID == 0 {
+		t.Fatalf("stored transactions = %+v, want [%+v], error = %v", before, created, err)
 	}
 
 	_, err = store.AddTransaction(ledger.Transaction{
@@ -78,31 +84,48 @@ func TestStorageBudgetLimit(t *testing.T) {
 	if !errors.Is(err, ledger.ErrBudgetExceeded) {
 		t.Fatalf("adding above the limit: error = %v, want ErrBudgetExceeded", err)
 	}
-	after := store.ListTransactions()
-	if len(after) != len(before) || after[0] != created {
-		t.Fatalf("stored transactions after rejection = %+v, want %+v", after, before)
+	after, err := store.ListTransactions()
+	if err != nil || !slices.Equal(before, after) {
+		t.Fatalf("stored transactions after rejection = %+v, want %+v, error = %v", after, before, err)
 	}
 }
 
-func TestStorageReset(t *testing.T) {
-	store := ledger.NewStorage()
-	t.Cleanup(store.Reset)
-	store.SetBudget(ledger.Budget{Category: "food", Limit: 50})
-
-	tx := ledger.Transaction{Amount: 50, Category: "food", Description: "lunch"}
-	if _, err := store.AddTransaction(tx); err != nil {
-		t.Fatal(err)
+func TestStorageUpsertsBudgets(t *testing.T) {
+	store := testutil.NewStorage(t, testMigration)
+	for _, budget := range []ledger.Budget{
+		{Category: "travel", Limit: 50},
+		{Category: "food", Limit: 20},
+		{Category: "food", Limit: 75.25},
+	} {
+		if err := store.SetBudget(budget); err != nil {
+			t.Fatal(err)
+		}
 	}
-
-	store.Reset()
-	if budgets, transactions := store.ListBudgets(), store.ListTransactions(); len(budgets) != 0 || len(transactions) != 0 {
-		t.Fatalf("after reset: budgets = %v, transactions = %v", budgets, transactions)
+	if err := store.SetBudget(ledger.Budget{Category: "food", Limit: 0}); err == nil {
+		t.Fatal("invalid budget was accepted")
 	}
+	want := []ledger.Budget{{Category: "food", Limit: 75.25}, {Category: "travel", Limit: 50}}
+	if got, err := store.ListBudgets(); err != nil || !slices.Equal(got, want) {
+		t.Fatalf("budgets = %v, want %v, error = %v", got, want, err)
+	}
+}
 
-	store.SetBudget(ledger.Budget{Category: "food", Limit: 75})
-	tx.Amount = 75
-	created, err := store.AddTransaction(tx)
-	if err != nil || created.ID != 1 {
-		t.Fatalf("first transaction after reset = %+v, error = %v", created, err)
+func TestStorageListsTransactionsNewestFirst(t *testing.T) {
+	store := testutil.NewStorage(t, testMigration)
+	if _, err := store.AddTransaction(ledger.Transaction{Category: "food", Description: "invalid amount"}); err == nil {
+		t.Fatal("invalid transaction was accepted")
+	}
+	newest := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
+	var created []ledger.Transaction
+	for _, date := range []time.Time{newest, newest.AddDate(0, 0, -1), newest} {
+		tx, err := store.AddTransaction(ledger.Transaction{Amount: 0.10, Category: "food", Description: "lunch", Date: date})
+		if err != nil {
+			t.Fatalf("add transaction without budget: %v", err)
+		}
+		created = append(created, tx)
+	}
+	want := []ledger.Transaction{created[2], created[0], created[1]}
+	if got, err := store.ListTransactions(); err != nil || !slices.Equal(got, want) {
+		t.Fatalf("transactions = %v, want %v, error = %v", got, want, err)
 	}
 }

@@ -8,13 +8,28 @@ import (
 	"testing"
 
 	ledger "ledger/core"
+	"ledger/testutil"
 )
 
 func newTestStorage(t *testing.T) *ledger.Storage {
 	t.Helper()
-	store := ledger.NewStorage()
-	t.Cleanup(store.Reset)
-	return store
+	return testutil.NewStorage(t, "../../../ledger/migrations/00001_create_budgets_and_expenses.up.sql")
+}
+
+func setTestBudget(t *testing.T, store *ledger.Storage, budget ledger.Budget) {
+	t.Helper()
+	if err := store.SetBudget(budget); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func storedTransactions(t *testing.T, store *ledger.Storage) []ledger.Transaction {
+	t.Helper()
+	transactions, err := store.ListTransactions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions
 }
 
 func TestBudgetAndTransactionFlow(t *testing.T) {
