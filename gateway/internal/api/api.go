@@ -71,7 +71,7 @@ func RegisterRoutes(mux *http.ServeMux, store *ledger.Storage) {
 	mux.HandleFunc("GET "+prefix+"/transactions", listTransactions(store.ListTransactions))
 	mux.HandleFunc("POST "+prefix+"/transactions", createTransaction(store.AddTransaction))
 	mux.HandleFunc("GET "+prefix+"/budgets", notImplemented)
-	mux.HandleFunc("POST "+prefix+"/budgets", notImplemented)
+	mux.HandleFunc("POST "+prefix+"/budgets", createBudget(store.SetBudget))
 	mux.HandleFunc("PUT "+prefix+"/budgets/{category}", notImplemented)
 }
 
