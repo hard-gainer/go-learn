@@ -10,6 +10,26 @@ import (
 	ledger "ledger/core"
 )
 
+func TestListBudgets(t *testing.T) {
+	store := ledger.NewStorage()
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, store)
+
+	check := func(want string) {
+		t.Helper()
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/budgets", nil))
+		if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/json" || strings.TrimSpace(w.Body.String()) != want {
+			t.Fatalf("status = %d, headers = %v, body = %s, want %s", w.Code, w.Header(), w.Body, want)
+		}
+	}
+
+	check("[]")
+	store.SetBudget(ledger.Budget{Category: "travel", Limit: 5000})
+	store.SetBudget(ledger.Budget{Category: "food", Limit: 2500})
+	check(`[{"category":"food","limit":2500},{"category":"travel","limit":5000}]`)
+}
+
 func TestCreateBudget(t *testing.T) {
 	store := ledger.NewStorage()
 	mux := http.NewServeMux()
