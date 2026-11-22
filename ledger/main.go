@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -17,15 +18,19 @@ import (
 func main() {
 	from := flag.String("from", "", "report start date (YYYY-MM-DD)")
 	to := flag.String("to", "", "report end date (YYYY-MM-DD)")
+	listen := flag.String("listen", "", "listen address for the report HTTP API")
 	flag.Parse()
 
-	if err := run(*from, *to); err != nil {
+	if err := run(*from, *to, *listen); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(from, to string) error {
+func run(from, to, listen string) error {
 	reportRequested := from != "" || to != ""
+	if reportRequested && listen != "" {
+		return fmt.Errorf("use either -listen or -from and -to")
+	}
 	var start, end time.Time
 	if reportRequested {
 		var err error
@@ -55,10 +60,22 @@ func run(from, to string) error {
 		log.Print("Ledger connected to Redis")
 	}
 
+	reports := report.New(store, redis)
+	if listen != "" {
+		mux := http.NewServeMux()
+		mux.HandleFunc("GET /api/reports/summary", reports.ServeSummary)
+		server := &http.Server{
+			Addr:              listen,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		log.Printf("Ledger report API listening on %s", listen)
+		return server.ListenAndServe()
+	}
 	if !reportRequested {
 		return nil
 	}
-	summary, err := report.New(store, redis).GetReportSummary(ctx, start, end)
+	summary, err := reports.GetReportSummary(ctx, start, end)
 	if err != nil {
 		return err
 	}

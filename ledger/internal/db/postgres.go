@@ -20,6 +20,8 @@ func Open() (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open PostgreSQL connection pool: %w", err)
 	}
+	conn.SetMaxOpenConns(10)
+	conn.SetMaxIdleConns(5)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

@@ -1,10 +1,42 @@
 package db
 
 import (
+	"database/sql"
 	"os"
 	"strings"
 	"testing"
 )
+
+func TestOpenAppliesPoolLimits(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("set TEST_DATABASE_URL to check the PostgreSQL pool")
+	}
+	t.Setenv("DATABASE_URL", dsn)
+	pool, err := Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	var held []*sql.Conn
+	for range 6 {
+		conn, err := pool.Conn(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		held = append(held, conn)
+		defer conn.Close()
+	}
+	for _, conn := range held {
+		if err := conn.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if stats := pool.Stats(); stats.MaxOpenConnections != 10 || stats.Idle != 5 {
+		t.Fatalf("pool stats = %+v, want 10 max open and 5 idle", stats)
+	}
+}
 
 func TestDSNFromEnv(t *testing.T) {
 	for _, name := range []string{"DATABASE_URL", "DB_HOST", "DB_PORT", "DB_USER", "DB_PASS", "DB_NAME"} {
