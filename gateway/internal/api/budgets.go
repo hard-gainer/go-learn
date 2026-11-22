@@ -15,7 +15,7 @@ func listBudgets(list func() map[string]ledger.Budget) http.HandlerFunc {
 		for _, category := range slices.Sorted(maps.Keys(budgets)) {
 			response = append(response, NewBudgetResponse(budgets[category]))
 		}
-		writeJSON(w, http.StatusOK, response)
+		WriteJSON(w, http.StatusOK, response)
 	}
 }
 
@@ -34,6 +34,6 @@ func createBudget(setBudget func(ledger.Budget)) http.HandlerFunc {
 		}
 
 		setBudget(budget)
-		writeJSON(w, http.StatusCreated, NewBudgetResponse(budget))
+		WriteJSON(w, http.StatusCreated, NewBudgetResponse(budget))
 	}
 }

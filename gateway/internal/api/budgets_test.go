@@ -19,7 +19,7 @@ func TestListBudgets(t *testing.T) {
 		t.Helper()
 		w := httptest.NewRecorder()
 		mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/budgets", nil))
-		if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/json" || strings.TrimSpace(w.Body.String()) != want {
+		if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || strings.TrimSpace(w.Body.String()) != want {
 			t.Fatalf("status = %d, headers = %v, body = %s, want %s", w.Code, w.Header(), w.Body, want)
 		}
 	}
@@ -61,7 +61,7 @@ func TestCreateBudget(t *testing.T) {
 
 	const budget = `{"category":"food","limit":2500}`
 	w := post(budget)
-	if w.Code != http.StatusCreated || w.Header().Get("Content-Type") != "application/json" || strings.TrimSpace(w.Body.String()) != budget {
+	if w.Code != http.StatusCreated || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || strings.TrimSpace(w.Body.String()) != budget {
 		t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
 	}
 

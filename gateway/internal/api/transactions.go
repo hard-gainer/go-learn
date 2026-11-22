@@ -15,7 +15,7 @@ func listTransactions(list func() []ledger.Transaction) http.HandlerFunc {
 		for _, tx := range transactions {
 			response = append(response, NewTransactionResponse(tx))
 		}
-		writeJSON(w, http.StatusOK, response)
+		WriteJSON(w, http.StatusOK, response)
 	}
 }
 
@@ -41,7 +41,7 @@ func createTransaction(addTransaction func(ledger.Transaction) (ledger.Transacti
 			log.Printf("add transaction: %v", err)
 			writeError(w, http.StatusInternalServerError, "internal server error")
 		default:
-			writeJSON(w, http.StatusCreated, NewTransactionResponse(created))
+			WriteJSON(w, http.StatusCreated, NewTransactionResponse(created))
 		}
 	}
 }

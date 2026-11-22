@@ -76,5 +76,5 @@ func RegisterRoutes(mux *http.ServeMux, store *ledger.Storage) {
 }
 
 func notImplemented(w http.ResponseWriter, _ *http.Request) {
-	http.Error(w, http.StatusText(http.StatusNotImplemented), http.StatusNotImplemented)
+	writeError(w, http.StatusNotImplemented, http.StatusText(http.StatusNotImplemented))
 }

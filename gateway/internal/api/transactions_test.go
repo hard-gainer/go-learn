@@ -21,7 +21,7 @@ func TestListTransactions(t *testing.T) {
 		t.Helper()
 		w := httptest.NewRecorder()
 		mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/transactions", nil))
-		if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/json" {
+		if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/json; charset=utf-8" {
 			t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
 		}
 		return strings.TrimSpace(w.Body.String())
@@ -67,7 +67,7 @@ func TestCreateTransaction(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := postTransaction(mux, tc.body)
-			if w.Code != tc.wantStatus || w.Header().Get("Content-Type") != "application/json" {
+			if w.Code != tc.wantStatus || w.Header().Get("Content-Type") != "application/json; charset=utf-8" {
 				t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
 			}
 			if tc.wantError != "" {
@@ -94,7 +94,7 @@ func TestCreateTransactionUnexpectedError(t *testing.T) {
 		return ledger.Transaction{}, errors.New("unexpected storage error")
 	})
 	w := postTransaction(handler, validTransaction)
-	if w.Code != http.StatusInternalServerError || strings.TrimSpace(w.Body.String()) != `{"error":"internal server error"}` {
+	if w.Code != http.StatusInternalServerError || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || strings.TrimSpace(w.Body.String()) != `{"error":"internal server error"}` {
 		t.Fatalf("status = %d, body = %s", w.Code, w.Body)
 	}
 }
