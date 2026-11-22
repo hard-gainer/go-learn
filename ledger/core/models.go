@@ -27,7 +27,7 @@ func (t *Transaction) Validate() error {
 		errs = append(errs, errors.New("category must't be blank"))
 	}
 	if t.Description == "" {
-		errs = append(errs, errors.New("category must't be blank"))
+		errs = append(errs, errors.New("description must not be blank"))
 	}
 	return errors.Join(errs...)
 }

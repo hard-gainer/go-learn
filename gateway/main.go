@@ -1,10 +1,13 @@
 package main
 
 import (
-	"fmt"
+	"bytes"
+	"log"
 	"net/http"
+	"os"
 
 	"gateway/internal/api"
+	ledger "ledger/core"
 )
 
 // В сервисе Gateway напишите функцию main, которая запускает простой HTTP-сервер на порту
@@ -17,11 +20,20 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	budgets, err := os.ReadFile("../ledger/budgets.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	store := ledger.NewStorage()
+	if err := store.LoadBudgets(bytes.NewReader(budgets)); err != nil {
+		log.Fatal(err)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ping", handlePing)
-	api.RegisterRoutes(mux)
+	api.RegisterRoutes(mux, store)
 
 	if err := http.ListenAndServe(":8080", mux); err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 }

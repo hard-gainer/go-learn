@@ -1,10 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -29,58 +26,6 @@ type Validatable interface {
 	Validate() error
 }
 
-type Storage []ledger.Transaction
-
-var budgetStorage = make(map[string]ledger.Budget, 4)
-
-func SetBudget(b ledger.Budget) {
-	budgetStorage[b.Category] = b
-}
-
-func LoadBudgets(r io.Reader) error {
-	var err error
-	budgets := make([]ledger.Budget, 0, 2)
-
-	if err = json.NewDecoder(r).Decode(&budgets); err != nil {
-		return fmt.Errorf("error decoding json file: %w", err)
-	}
-
-	for _, budget := range budgets {
-		SetBudget(budget)
-	}
-	return err
-}
-
-func (s *Storage) AddTransaction(tx ledger.Transaction) error {
-	if err := tx.Validate(); err != nil {
-		return fmt.Errorf("invalid transaction: %w", err)
-	}
-
-	if budget, ok := budgetStorage[tx.Category]; ok {
-		total := s.computeTotalByCategory(tx.Category) + tx.Amount
-		if budget.Limit < total {
-			return errors.New("budget exceeded")
-		}
-	}
-
-	*s = append(*s, tx)
-	return nil
-}
-
-func (s *Storage) ListTransactions() []ledger.Transaction {
-	return *s
-}
-
-func (s *Storage) computeTotalByCategory(category string) float64 {
-	var sum float64
-	for _, tx := range *s {
-		if tx.Category == category {
-			sum += tx.Amount
-		}
-	}
-	return sum
-}
-
 func CheckValid(v Validatable) error {
 	return v.Validate()
 }
@@ -88,9 +33,9 @@ func CheckValid(v Validatable) error {
 func main() {
 	fmt.Println("Ledger service started")
 
-	s := make(Storage, 0, 10)
+	s := ledger.NewStorage()
 
-	err1 := s.AddTransaction(ledger.Transaction{
+	_, err1 := s.AddTransaction(ledger.Transaction{
 		ID:          1,
 		Amount:      100.0,
 		Category:    "subscription",
@@ -101,7 +46,7 @@ func main() {
 		fmt.Println(err1)
 	}
 
-	err2 := s.AddTransaction(ledger.Transaction{
+	_, err2 := s.AddTransaction(ledger.Transaction{
 		ID:          2,
 		Amount:      300.0,
 		Category:    "subscription",
@@ -116,11 +61,11 @@ func main() {
 		fmt.Println(tx)
 	}
 
-	SetBudget(ledger.Budget{Category: "Хозтовары", Limit: 1000.0})
-	SetBudget(ledger.Budget{Category: "Развлечения", Limit: 5000.0})
+	s.SetBudget(ledger.Budget{Category: "Хозтовары", Limit: 1000.0})
+	s.SetBudget(ledger.Budget{Category: "Развлечения", Limit: 5000.0})
 
 	// превышение лимита
-	err3 := s.AddTransaction(ledger.Transaction{
+	_, err3 := s.AddTransaction(ledger.Transaction{
 		ID:          3,
 		Amount:      50000.0,
 		Category:    "Развлечения",
@@ -132,7 +77,7 @@ func main() {
 	}
 
 	// должна пройти
-	err4 := s.AddTransaction(ledger.Transaction{
+	_, err4 := s.AddTransaction(ledger.Transaction{
 		ID:          4,
 		Amount:      1000.0,
 		Category:    "Развлечения",
@@ -148,12 +93,14 @@ func main() {
 		panic(fileErr)
 	}
 
-	err := LoadBudgets(f)
+	defer f.Close()
+
+	err := s.LoadBudgets(f)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	fmt.Println(budgetStorage)
+	fmt.Println(s.ListBudgets())
 
 	var b Validatable = &ledger.Budget{}
 	validBErr := CheckValid(b)

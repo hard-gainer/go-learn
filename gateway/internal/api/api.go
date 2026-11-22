@@ -65,11 +65,11 @@ func NewBudgetResponse(budget ledger.Budget) BudgetResponse {
 	}
 }
 
-func RegisterRoutes(mux *http.ServeMux) {
+func RegisterRoutes(mux *http.ServeMux, store *ledger.Storage) {
 	const prefix = "/api"
 
 	mux.HandleFunc("GET "+prefix+"/transactions", notImplemented)
-	mux.HandleFunc("POST "+prefix+"/transactions", notImplemented)
+	mux.HandleFunc("POST "+prefix+"/transactions", createTransaction(store.AddTransaction))
 	mux.HandleFunc("GET "+prefix+"/budgets", notImplemented)
 	mux.HandleFunc("POST "+prefix+"/budgets", notImplemented)
 	mux.HandleFunc("PUT "+prefix+"/budgets/{category}", notImplemented)
