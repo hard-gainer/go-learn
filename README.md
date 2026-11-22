@@ -10,6 +10,27 @@ go -C gateway run .
 
 Gateway слушает порт `8080` и загружает начальные бюджеты из [ledger/budgets.json](ledger/budgets.json). Транзакции и изменения бюджетов хранятся в памяти до перезапуска.
 
+## Миграции PostgreSQL
+
+Из корня репозитория установите Goose в локальный каталог Ledger. [Документация по установке Goose](https://pressly.github.io/goose/installation/)
+
+```bash
+GOBIN="$PWD/ledger/.bin" go install github.com/pressly/goose/v3/cmd/goose@v3.30.1
+```
+
+Создайте базу PostgreSQL и укажите её адрес в `LEDGER_DATABASE_URL`. Makefile объединяет два исходных SQL-файла во временный файл миграции Goose. [Документация по SQL-миграциям Goose](https://pressly.github.io/goose/documentation/annotations/)
+
+```bash
+export LEDGER_DATABASE_URL='postgres://ledger:password@localhost:5432/ledger?sslmode=disable'
+make migrate-up
+```
+
+Чтобы откатить миграцию, выполните команду в том же терминале. Откат удаляет обе таблицы вместе с данными.
+
+```bash
+make migrate-down
+```
+
 ## Тесты и покрытие
 
 Из корня репозитория запустите тесты обоих модулей. Флаг `-v` показывает отдельные сценарии.
