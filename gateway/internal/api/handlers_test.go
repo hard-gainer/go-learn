@@ -2,19 +2,35 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	ledger "ledger/core"
+	"ledger/testutil"
 )
 
 func newTestStorage(t *testing.T) *ledger.Storage {
 	t.Helper()
-	store := ledger.NewStorage()
-	t.Cleanup(store.Reset)
-	return store
+	return testutil.NewStorage(t, "../../../ledger/migrations/00001_create_budgets_and_expenses.up.sql")
+}
+
+func setTestBudget(t *testing.T, store *ledger.Storage, budget ledger.Budget) {
+	t.Helper()
+	if err := store.SetBudget(budget); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func storedTransactions(t *testing.T, store *ledger.Storage) []ledger.Transaction {
+	t.Helper()
+	transactions, err := store.ListTransactions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions
 }
 
 func TestBudgetAndTransactionFlow(t *testing.T) {
@@ -77,4 +93,37 @@ func TestBudgetAndTransactionFlow(t *testing.T) {
 			t.Fatalf("error response = %s, decode error = %v", got, err)
 		}
 	})
+}
+
+func TestReadAndBudgetStorageErrors(t *testing.T) {
+	t.Parallel()
+
+	storageErr := errors.New("database unavailable")
+	for _, tc := range []struct {
+		name    string
+		method  string
+		path    string
+		body    string
+		handler http.HandlerFunc
+	}{
+		{"list budgets", http.MethodGet, "/api/budgets", "",
+			listBudgets(func() ([]ledger.Budget, error) { return nil, storageErr })},
+		{"set budget", http.MethodPost, "/api/budgets", `{"category":"food","limit":100}`,
+			createBudget(func(ledger.Budget) error { return storageErr })},
+		{"list transactions", http.MethodGet, "/api/transactions", "",
+			listTransactions(func() ([]ledger.Transaction, error) { return nil, storageErr })},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			w := httptest.NewRecorder()
+			tc.handler.ServeHTTP(w, req)
+			if w.Code != http.StatusInternalServerError ||
+				w.Header().Get("Content-Type") != "application/json; charset=utf-8" ||
+				strings.TrimSpace(w.Body.String()) != `{"error":"internal server error"}` {
+				t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
+			}
+		})
+	}
 }

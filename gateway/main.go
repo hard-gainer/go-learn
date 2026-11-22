@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"gateway/internal/api"
@@ -20,14 +18,11 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	budgets, err := os.ReadFile("../ledger/budgets.json")
+	store, err := ledger.OpenStorage()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Gateway database initialization failed: %v", err)
 	}
-	store := ledger.NewStorage()
-	if err := store.LoadBudgets(bytes.NewReader(budgets)); err != nil {
-		log.Fatal(err)
-	}
+	defer store.Close()
 
 	if err := http.ListenAndServe(":8080", newHandler(store)); err != nil {
 		log.Fatal(err)

@@ -63,7 +63,7 @@ func TestCreateTransaction(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			store := newTestStorage(t)
-			store.SetBudget(ledger.Budget{Category: "food", Limit: 5000})
+			setTestBudget(t, store, ledger.Budget{Category: "food", Limit: 5000})
 			mux := http.NewServeMux()
 			RegisterRoutes(mux, store)
 
@@ -73,7 +73,7 @@ func TestCreateTransaction(t *testing.T) {
 					t.Fatalf("initial transaction: status = %d, body = %s", first.Code, first.Body)
 				}
 			}
-			before := len(store.ListTransactions())
+			before := len(storedTransactions(t, store))
 			w := postTransaction(mux, tc.body)
 			if w.Code != tc.wantStatus || w.Header().Get("Content-Type") != "application/json; charset=utf-8" {
 				t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
@@ -83,7 +83,7 @@ func TestCreateTransaction(t *testing.T) {
 				if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || !strings.HasPrefix(body["error"], tc.wantError) {
 					t.Fatalf("body = %s, decode error = %v", w.Body, err)
 				}
-				if got := len(store.ListTransactions()); got != before {
+				if got := len(storedTransactions(t, store)); got != before {
 					t.Fatalf("stored transactions = %d, want %d", got, before)
 				}
 				return
@@ -92,7 +92,7 @@ func TestCreateTransaction(t *testing.T) {
 			if err := json.Unmarshal(w.Body.Bytes(), &tx); err != nil || tx.ID != 1 || tx.Amount != 3000 || tx.Category != "food" || tx.Description != "lunch" || tx.Date.IsZero() {
 				t.Fatalf("transaction = %+v, decode error = %v", tx, err)
 			}
-			if got := len(store.ListTransactions()); got != before+1 {
+			if got := len(storedTransactions(t, store)); got != before+1 {
 				t.Fatalf("stored transactions = %d, want %d", got, before+1)
 			}
 		})
@@ -113,7 +113,7 @@ func TestCreateTransactionUnexpectedError(t *testing.T) {
 
 func TestConcurrentTransactionsRespectBudget(t *testing.T) {
 	store := newTestStorage(t)
-	store.SetBudget(ledger.Budget{Category: "food", Limit: 5000})
+	setTestBudget(t, store, ledger.Budget{Category: "food", Limit: 5000})
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, store)
 
@@ -125,7 +125,7 @@ func TestConcurrentTransactionsRespectBudget(t *testing.T) {
 	for range 2 {
 		counts[<-statuses]++
 	}
-	if counts[http.StatusCreated] != 1 || counts[http.StatusConflict] != 1 || len(store.ListTransactions()) != 1 {
+	if counts[http.StatusCreated] != 1 || counts[http.StatusConflict] != 1 || len(storedTransactions(t, store)) != 1 {
 		t.Fatalf("response status counts = %v", counts)
 	}
 }

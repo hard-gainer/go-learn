@@ -10,9 +10,7 @@ import (
 )
 
 func TestServerJSONResponses(t *testing.T) {
-	store := ledger.NewStorage()
-	t.Cleanup(store.Reset)
-	handler := newHandler(store)
+	handler := newHandler(&ledger.Storage{})
 	for _, tc := range []struct {
 		method string
 		path   string
