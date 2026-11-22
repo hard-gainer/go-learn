@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"gateway/internal/api"
 	ledger "ledger/core"
@@ -33,7 +34,18 @@ func main() {
 	mux.HandleFunc("GET /ping", handlePing)
 	api.RegisterRoutes(mux, store)
 
-	if err := http.ListenAndServe(":8080", mux); err != nil {
+	if err := http.ListenAndServe(":8080", logRequests(mux)); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		defer func() {
+			log.Printf("method=%s path=%q duration=%s", r.Method, r.URL.Path, time.Since(start))
+		}()
+
+		next.ServeHTTP(w, r)
+	})
 }
