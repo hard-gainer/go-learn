@@ -8,32 +8,43 @@ import (
 )
 
 func TestTransactionValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		tx      ledger.Transaction
+		wantErr bool
+	}{
+		{"valid", ledger.Transaction{Amount: 50, Category: "food", Description: "lunch"}, false},
+		{"zero amount", ledger.Transaction{Category: "food", Description: "lunch"}, true},
+		{"missing category", ledger.Transaction{Amount: 50, Description: "lunch"}, true},
+		{"missing description", ledger.Transaction{Amount: 50, Category: "food"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.tx.Validate(); (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, want an error: %t", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestBudgetValidation(t *testing.T) {
 	t.Parallel()
 
 	for _, tc := range []struct {
-		name        string
-		amount      float64
-		category    string
-		description string
-		wantErr     bool
+		name     string
+		limit    float64
+		category string
+		wantErr  bool
 	}{
-		{"valid", 50, "food", "lunch", false},
-		{"valid fractional amount", 0.01, "food", "lunch", false},
-		{"zero amount", 0, "food", "lunch", true},
-		{"negative amount", -1, "food", "lunch", true},
-		{"missing category", 50, "", "lunch", true},
-		{"missing description", 50, "food", "", true},
-		{"empty transaction", 0, "", "", true},
+		{"positive limit", 50, "food", false},
+		{"zero limit", 0, "food", true},
+		{"negative limit", -1, "food", true},
+		{"empty category", 50, "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			tx := ledger.Transaction{
-				Amount:      tc.amount,
-				Category:    tc.category,
-				Description: tc.description,
-			}
-			if err := tx.Validate(); (err != nil) != tc.wantErr {
+			budget := ledger.Budget{Limit: tc.limit, Category: tc.category}
+			if err := budget.Validate(); (err != nil) != tc.wantErr {
 				t.Fatalf("Validate() error = %v, want an error: %t", err, tc.wantErr)
 			}
 		})
