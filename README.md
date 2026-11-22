@@ -41,16 +41,27 @@ go -C ledger run .
 
 Если `DATABASE_URL` не задана, Ledger собирает адрес из `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS` и `DB_NAME`. Значения по умолчанию для локальной разработки — `localhost`, `5432`, `postgres`, `postgres` и `cashapp` соответственно, с `sslmode=disable`.
 
+## Redis и отчёт Ledger
+
+Запустите Redis, например в Docker. Ledger читает `REDIS_ADDR` (по умолчанию `localhost:6379`), `REDIS_DB` (по умолчанию `0`) и необязательный `REDIS_PASSWORD`.
+
+```bash
+docker run -d --name cashcraft-redis -p 127.0.0.1:6379:6379 redis:7-alpine
+go -C ledger run . -from 2025-09-01 -to 2025-09-30
+```
+
+Ledger выводит JSON-массив с суммой расходов по каждой категории. Обе даты входят в отчёт. Сводка хранится в Redis 30 секунд по ключу `report:summary:<from>:<to>`. При недоступности Redis Ledger строит отчёт напрямую из PostgreSQL.
+
 ## Тесты и покрытие
 
-Из корня репозитория запустите тесты обоих модулей. Для интеграционных тестов задайте `TEST_DATABASE_URL` с адресом отдельной тестовой базы PostgreSQL. Тесты создают и удаляют изолированную схему для каждого сценария. Без этой переменной сценарии с PostgreSQL пропускаются. Флаг `-v` показывает отдельные сценарии.
+Из корня репозитория запустите тесты обоих модулей. Для интеграционных тестов задайте `TEST_DATABASE_URL` с адресом тестовой базы PostgreSQL. Тесты создают и удаляют отдельную схему для каждого сценария. Для проверки кеша также задайте `TEST_REDIS_ADDR` с адресом тестового Redis и при необходимости `REDIS_DB` и `REDIS_PASSWORD`. Без этих адресов соответствующие тесты пропускаются. Флаг `-v` показывает отдельные сценарии.
 
 ```bash
 go -C ledger test -v ./...
 go -C gateway test -v ./...
 ```
 
-Покрытие операторов в Gateway и Ledger составляет **67,1%**. Чтобы получить общий профиль для двух модулей и HTML-отчёт, выполните из корня репозитория следующее.
+Покрытие операторов в Gateway и Ledger с тестовыми PostgreSQL и Redis составляет **75,5%**. Чтобы получить общий профиль для двух модулей и HTML-отчёт, выполните из корня репозитория следующее.
 
 ```bash
 (
@@ -58,7 +69,7 @@ go -C gateway test -v ./...
   GOWORK=off go -C "$coverage_workspace" work init "$PWD/gateway" "$PWD/ledger" &&
   export GOWORK="$coverage_workspace/go.work" &&
   go test ./gateway/... ./ledger/... -cover \
-    -coverpkg=./gateway,./gateway/internal/api,./ledger,./ledger/core,./ledger/internal/db \
+    -coverpkg=./gateway,./gateway/internal/api,./ledger,./ledger/core,./ledger/internal/db,./ledger/internal/cache,./ledger/internal/report \
     -coverprofile=cover.out &&
   go tool cover -func=cover.out &&
   go tool cover -html=cover.out -o cover.html
