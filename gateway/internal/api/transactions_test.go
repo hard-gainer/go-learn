@@ -15,7 +15,7 @@ const validTransaction = `{"amount":3000,"category":"food","description":"lunch"
 
 func TestListTransactions(t *testing.T) {
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, ledger.NewStorage())
+	RegisterRoutes(mux, newTestStorage(t))
 
 	get := func() string {
 		t.Helper()
@@ -48,7 +48,7 @@ func postTransaction(handler http.Handler, body string) *httptest.ResponseRecord
 }
 
 func TestCreateTransaction(t *testing.T) {
-	store := ledger.NewStorage()
+	store := newTestStorage(t)
 	store.SetBudget(ledger.Budget{Category: "food", Limit: 5000})
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, store)
@@ -100,7 +100,7 @@ func TestCreateTransactionUnexpectedError(t *testing.T) {
 }
 
 func TestConcurrentTransactionsRespectBudget(t *testing.T) {
-	store := ledger.NewStorage()
+	store := newTestStorage(t)
 	store.SetBudget(ledger.Budget{Category: "food", Limit: 5000})
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, store)

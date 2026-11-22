@@ -1,0 +1,68 @@
+package main_test
+
+import (
+	"errors"
+	"testing"
+
+	ledger "ledger/core"
+)
+
+func TestTransactionValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		tx      ledger.Transaction
+		wantErr bool
+	}{
+		{"valid", ledger.Transaction{Amount: 50, Category: "food", Description: "lunch"}, false},
+		{"zero amount", ledger.Transaction{Category: "food", Description: "lunch"}, true},
+		{"missing category", ledger.Transaction{Amount: 50, Description: "lunch"}, true},
+		{"missing description", ledger.Transaction{Amount: 50, Category: "food"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := tc.tx.Validate(); (err != nil) != tc.wantErr {
+				t.Fatalf("Validate() error = %v, want an error: %t", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestStorageBudgetLimit(t *testing.T) {
+	store := ledger.NewStorage()
+	t.Cleanup(store.Reset)
+	store.SetBudget(ledger.Budget{Category: "food", Limit: 50})
+
+	tx := ledger.Transaction{Amount: 50, Category: "food", Description: "lunch"}
+	created, err := store.AddTransaction(tx)
+	if err != nil || created.ID != 1 {
+		t.Fatalf("transaction at the budget limit = %+v, error = %v", created, err)
+	}
+	if _, err := store.AddTransaction(tx); !errors.Is(err, ledger.ErrBudgetExceeded) {
+		t.Fatalf("adding above the limit: error = %v, want ErrBudgetExceeded", err)
+	}
+	if transactions := store.ListTransactions(); len(transactions) != 1 || transactions[0] != created {
+		t.Fatalf("stored transactions = %+v, want [%+v]", transactions, created)
+	}
+}
+
+func TestStorageReset(t *testing.T) {
+	store := ledger.NewStorage()
+	t.Cleanup(store.Reset)
+	store.SetBudget(ledger.Budget{Category: "food", Limit: 50})
+
+	tx := ledger.Transaction{Amount: 50, Category: "food", Description: "lunch"}
+	if _, err := store.AddTransaction(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	store.Reset()
+	if budgets, transactions := store.ListBudgets(), store.ListTransactions(); len(budgets) != 0 || len(transactions) != 0 {
+		t.Fatalf("after reset: budgets = %v, transactions = %v", budgets, transactions)
+	}
+
+	store.SetBudget(ledger.Budget{Category: "food", Limit: 75})
+	tx.Amount = 75
+	created, err := store.AddTransaction(tx)
+	if err != nil || created.ID != 1 {
+		t.Fatalf("first transaction after reset = %+v, error = %v", created, err)
+	}
+}

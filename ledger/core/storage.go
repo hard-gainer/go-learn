@@ -23,6 +23,16 @@ func NewStorage() *Storage {
 	return &Storage{budgets: make(map[string]Budget)}
 }
 
+// Reset clears transactions, budgets, and the transaction ID counter.
+func (s *Storage) Reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.transactions = nil
+	clear(s.budgets)
+	s.lastID = 0
+}
+
 func (s *Storage) SetBudget(budget Budget) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

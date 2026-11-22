@@ -11,7 +11,7 @@ import (
 )
 
 func TestListBudgets(t *testing.T) {
-	store := ledger.NewStorage()
+	store := newTestStorage(t)
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, store)
 
@@ -31,7 +31,7 @@ func TestListBudgets(t *testing.T) {
 }
 
 func TestCreateBudget(t *testing.T) {
-	store := ledger.NewStorage()
+	store := newTestStorage(t)
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, store)
 
