@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"time"
 
 	ledger "ledger/core"
+	"ledger/internal/db"
 )
 
 // 1. Создайте интерфейс Validatable с единственным методом Validate() error. Назначение интерфейса — задать контракт на проверку валидности данных структуры.
@@ -31,6 +33,13 @@ func CheckValid(v Validatable) error {
 }
 
 func main() {
+	conn, err := db.Open()
+	if err != nil {
+		log.Fatalf("Ledger startup failed: %v", err)
+	}
+	defer conn.Close()
+	log.Print("Ledger connected to PostgreSQL")
+
 	fmt.Println("Ledger service started")
 
 	s := ledger.NewStorage()
@@ -95,8 +104,7 @@ func main() {
 
 	defer f.Close()
 
-	err := s.LoadBudgets(f)
-	if err != nil {
+	if err := s.LoadBudgets(f); err != nil {
 		fmt.Println(err)
 	}
 

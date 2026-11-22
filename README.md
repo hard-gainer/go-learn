@@ -18,10 +18,10 @@ Gateway слушает порт `8080` и загружает начальные 
 GOBIN="$PWD/ledger/.bin" go install github.com/pressly/goose/v3/cmd/goose@v3.30.1
 ```
 
-Создайте базу PostgreSQL и укажите её адрес в `LEDGER_DATABASE_URL`. Makefile объединяет два исходных SQL-файла во временный файл миграции Goose. [Документация по SQL-миграциям Goose](https://pressly.github.io/goose/documentation/annotations/)
+Запустите PostgreSQL локально или в Docker и создайте базу `cashapp`. Укажите её адрес в `DATABASE_URL`. Makefile объединяет два исходных SQL-файла во временный файл миграции Goose. [Документация по SQL-миграциям Goose](https://pressly.github.io/goose/documentation/annotations/)
 
 ```bash
-export LEDGER_DATABASE_URL='postgres://ledger:password@localhost:5432/ledger?sslmode=disable'
+export DATABASE_URL='postgres://postgres:postgres@localhost:5432/cashapp?sslmode=disable'
 make migrate-up
 ```
 
@@ -30,6 +30,16 @@ make migrate-up
 ```bash
 make migrate-down
 ```
+
+Применяйте миграции перед первым запуском Ledger и после каждого изменения схемы. После успешного `make migrate-up` запустите Ledger из того же терминала, чтобы он получил `DATABASE_URL`.
+
+```bash
+go -C ledger run .
+```
+
+При успешном подключении Ledger выведет `Ledger connected to PostgreSQL`. Затем запустите Gateway командой `go -C gateway run .` и проверьте HTTP-эндпоинты.
+
+Если `DATABASE_URL` не задана, Ledger собирает адрес из `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS` и `DB_NAME`. Значения по умолчанию для локальной разработки — `localhost`, `5432`, `postgres`, `postgres` и `cashapp` соответственно, с `sslmode=disable`.
 
 ## Тесты и покрытие
 
@@ -40,7 +50,7 @@ go -C ledger test -v ./...
 go -C gateway test -v ./...
 ```
 
-Покрытие операторов в Gateway и Ledger составляет **68,3%**. Чтобы получить общий профиль для двух модулей и HTML-отчёт, выполните из корня репозитория следующее.
+Покрытие операторов в Gateway и Ledger составляет **67,1%**. Чтобы получить общий профиль для двух модулей и HTML-отчёт, выполните из корня репозитория следующее.
 
 ```bash
 (
