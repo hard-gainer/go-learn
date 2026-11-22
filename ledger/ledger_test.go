@@ -54,18 +54,28 @@ func TestBudgetValidation(t *testing.T) {
 func TestStorageBudgetLimit(t *testing.T) {
 	store := ledger.NewStorage()
 	t.Cleanup(store.Reset)
-	store.SetBudget(ledger.Budget{Category: "food", Limit: 50})
+	store.SetBudget(ledger.Budget{Category: "еда", Limit: 5000})
 
-	tx := ledger.Transaction{Amount: 50, Category: "food", Description: "lunch"}
-	created, err := store.AddTransaction(tx)
-	if err != nil || created.ID != 1 {
-		t.Fatalf("transaction at the budget limit = %+v, error = %v", created, err)
+	created, err := store.AddTransaction(ledger.Transaction{
+		Amount: 3000, Category: "еда", Description: "продукты",
+	})
+	if err != nil {
+		t.Fatalf("transaction within the budget: %v", err)
 	}
-	if _, err := store.AddTransaction(tx); !errors.Is(err, ledger.ErrBudgetExceeded) {
+	before := store.ListTransactions()
+	if len(before) != 1 || before[0] != created {
+		t.Fatalf("stored transactions = %+v, want [%+v]", before, created)
+	}
+
+	_, err = store.AddTransaction(ledger.Transaction{
+		Amount: 2500, Category: "еда", Description: "ужин",
+	})
+	if !errors.Is(err, ledger.ErrBudgetExceeded) {
 		t.Fatalf("adding above the limit: error = %v, want ErrBudgetExceeded", err)
 	}
-	if transactions := store.ListTransactions(); len(transactions) != 1 || transactions[0] != created {
-		t.Fatalf("stored transactions = %+v, want [%+v]", transactions, created)
+	after := store.ListTransactions()
+	if len(after) != len(before) || after[0] != created {
+		t.Fatalf("stored transactions after rejection = %+v, want %+v", after, before)
 	}
 }
 
