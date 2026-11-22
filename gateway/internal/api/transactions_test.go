@@ -13,6 +13,34 @@ import (
 
 const validTransaction = `{"amount":3000,"category":"food","description":"lunch","date":"2026-11-22T10:00:00Z"}`
 
+func TestListTransactions(t *testing.T) {
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, ledger.NewStorage())
+
+	get := func() string {
+		t.Helper()
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/transactions", nil))
+		if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/json" {
+			t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
+		}
+		return strings.TrimSpace(w.Body.String())
+	}
+
+	if got := get(); got != "[]" {
+		t.Fatalf("empty list = %s, want []", got)
+	}
+
+	created := postTransaction(mux, validTransaction)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, body = %s", created.Code, created.Body)
+	}
+	want := "[" + strings.TrimSpace(created.Body.String()) + "]"
+	if got := get(); got != want {
+		t.Fatalf("list = %s, want %s", got, want)
+	}
+}
+
 func postTransaction(handler http.Handler, body string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/transactions", strings.NewReader(body)))

@@ -10,6 +10,17 @@ import (
 	ledger "ledger/core"
 )
 
+func listTransactions(list func() []ledger.Transaction) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		transactions := list()
+		response := make([]TransactionResponse, 0, len(transactions))
+		for _, tx := range transactions {
+			response = append(response, NewTransactionResponse(tx))
+		}
+		writeJSON(w, http.StatusOK, response)
+	}
+}
+
 func createTransaction(addTransaction func(ledger.Transaction) (ledger.Transaction, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req CreateTransactionRequest
