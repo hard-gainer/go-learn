@@ -36,8 +36,10 @@ func TestCreateBudget(t *testing.T) {
 	RegisterRoutes(mux, store)
 
 	post := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/budgets", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/budgets", strings.NewReader(body)))
+		mux.ServeHTTP(w, req)
 		return w
 	}
 
@@ -51,8 +53,9 @@ func TestCreateBudget(t *testing.T) {
 		w := post(tc.body)
 		var body map[string]string
 		err := json.Unmarshal(w.Body.Bytes(), &body)
-		if w.Code != http.StatusBadRequest || err != nil || !strings.HasPrefix(body["error"], tc.wantError) {
-			t.Fatalf("status = %d, body = %s, decode error = %v", w.Code, w.Body, err)
+		if w.Code != http.StatusBadRequest || w.Header().Get("Content-Type") != "application/json; charset=utf-8" ||
+			err != nil || len(body) != 1 || !strings.HasPrefix(body["error"], tc.wantError) {
+			t.Fatalf("status = %d, headers = %v, body = %s, decode error = %v", w.Code, w.Header(), w.Body, err)
 		}
 	}
 	if len(store.ListBudgets()) != 0 {
@@ -63,6 +66,12 @@ func TestCreateBudget(t *testing.T) {
 	w := post(budget)
 	if w.Code != http.StatusCreated || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || strings.TrimSpace(w.Body.String()) != budget {
 		t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
+	}
+
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/budgets", nil))
+	if w.Code != http.StatusOK || w.Header().Get("Content-Type") != "application/json; charset=utf-8" || strings.TrimSpace(w.Body.String()) != "["+budget+"]" {
+		t.Fatalf("list budgets: status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
 	}
 
 	w = postTransaction(mux, validTransaction)
