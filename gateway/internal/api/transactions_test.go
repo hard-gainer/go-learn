@@ -48,11 +48,6 @@ func postTransaction(handler http.Handler, body string) *httptest.ResponseRecord
 }
 
 func TestCreateTransaction(t *testing.T) {
-	store := newTestStorage(t)
-	store.SetBudget(ledger.Budget{Category: "food", Limit: 5000})
-	mux := http.NewServeMux()
-	RegisterRoutes(mux, store)
-
 	for _, tc := range []struct {
 		name       string
 		body       string
@@ -61,11 +56,24 @@ func TestCreateTransaction(t *testing.T) {
 	}{
 		{"invalid JSON", `{"amount":}`, http.StatusBadRequest, "invalid JSON:"},
 		{"trailing JSON", validTransaction + " {}", http.StatusBadRequest, "request body must contain exactly one JSON object"},
+		{"invalid date", strings.Replace(validTransaction, "2026-11-22T10:00:00Z", "2026-02-30", 1), http.StatusBadRequest, "invalid JSON: date must be YYYY-MM-DD or RFC 3339"},
 		{"invalid amount", strings.Replace(validTransaction, "3000", "-1", 1), http.StatusBadRequest, "amount must be a positive number"},
 		{"created", validTransaction, http.StatusCreated, ""},
 		{"budget exceeded", validTransaction, http.StatusConflict, "budget exceeded"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			store := newTestStorage(t)
+			store.SetBudget(ledger.Budget{Category: "food", Limit: 5000})
+			mux := http.NewServeMux()
+			RegisterRoutes(mux, store)
+
+			if tc.wantStatus == http.StatusConflict {
+				first := postTransaction(mux, validTransaction)
+				if first.Code != http.StatusCreated {
+					t.Fatalf("initial transaction: status = %d, body = %s", first.Code, first.Body)
+				}
+			}
+			before := len(store.ListTransactions())
 			w := postTransaction(mux, tc.body)
 			if w.Code != tc.wantStatus || w.Header().Get("Content-Type") != "application/json; charset=utf-8" {
 				t.Fatalf("status = %d, headers = %v, body = %s", w.Code, w.Header(), w.Body)
@@ -75,21 +83,25 @@ func TestCreateTransaction(t *testing.T) {
 				if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || !strings.HasPrefix(body["error"], tc.wantError) {
 					t.Fatalf("body = %s, decode error = %v", w.Body, err)
 				}
+				if got := len(store.ListTransactions()); got != before {
+					t.Fatalf("stored transactions = %d, want %d", got, before)
+				}
 				return
 			}
 			var tx TransactionResponse
 			if err := json.Unmarshal(w.Body.Bytes(), &tx); err != nil || tx.ID != 1 || tx.Amount != 3000 || tx.Category != "food" || tx.Description != "lunch" || tx.Date.IsZero() {
 				t.Fatalf("transaction = %+v, decode error = %v", tx, err)
 			}
+			if got := len(store.ListTransactions()); got != before+1 {
+				t.Fatalf("stored transactions = %d, want %d", got, before+1)
+			}
 		})
-	}
-
-	if got := len(store.ListTransactions()); got != 1 {
-		t.Fatalf("stored transactions = %d, want 1", got)
 	}
 }
 
 func TestCreateTransactionUnexpectedError(t *testing.T) {
+	t.Parallel()
+
 	handler := createTransaction(func(ledger.Transaction) (ledger.Transaction, error) {
 		return ledger.Transaction{}, errors.New("unexpected storage error")
 	})

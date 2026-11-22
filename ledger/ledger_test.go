@@ -8,6 +8,8 @@ import (
 )
 
 func TestTransactionValidation(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name    string
 		tx      ledger.Transaction
@@ -15,10 +17,13 @@ func TestTransactionValidation(t *testing.T) {
 	}{
 		{"valid", ledger.Transaction{Amount: 50, Category: "food", Description: "lunch"}, false},
 		{"zero amount", ledger.Transaction{Category: "food", Description: "lunch"}, true},
+		{"negative amount", ledger.Transaction{Amount: -1, Category: "food", Description: "lunch"}, true},
 		{"missing category", ledger.Transaction{Amount: 50, Description: "lunch"}, true},
 		{"missing description", ledger.Transaction{Amount: 50, Category: "food"}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			if err := tc.tx.Validate(); (err != nil) != tc.wantErr {
 				t.Fatalf("Validate() error = %v, want an error: %t", err, tc.wantErr)
 			}
