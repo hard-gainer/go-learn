@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net/http"
+
+	"gateway/internal/api"
 )
 
 // В сервисе Gateway напишите функцию main, которая запускает простой HTTP-сервер на порту
@@ -15,8 +17,11 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("GET /ping", handlePing)
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /ping", handlePing)
+	api.RegisterRoutes(mux)
+
+	if err := http.ListenAndServe(":8080", mux); err != nil {
 		fmt.Println(err)
 	}
 }
